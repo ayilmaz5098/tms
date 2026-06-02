@@ -526,8 +526,6 @@ router.get('/dashboard', auth, async (req, res) => {
   });
 });
 
-module.exports = router;
-
 // ─── MOTOR TESTS ─────────────────────────────────────────
 router.get('/motors/:motorId/tests', auth, async (req, res) => {
   const { rows } = await pool.query(
@@ -601,3 +599,5 @@ router.patch('/motors/:motorId/tests/:stepCode/admin-edit', auth, requireRole('a
   if (!rows[0]) return res.status(404).json({ error: 'Test bulunamadı' });
   res.json(rows[0]);
 });
+
+module.exports = router;

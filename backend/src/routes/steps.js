@@ -327,8 +327,6 @@ router.post('/:rotorId/:section/:step/measurements', auth, async (req, res) => {
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 });
 
-module.exports = router;
-
 // POST /api/steps/:rotorId/:section/:step/toggle-qc — admin toggles QC requirement
 router.post('/:rotorId/:section/:step/toggle-qc', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
@@ -386,3 +384,5 @@ router.patch('/:rotorId/:section/:step/admin-edit', auth, requireRole('admin'), 
     res.json(rows[0]);
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 });
+
+module.exports = router;
