@@ -813,7 +813,8 @@ function MotorDetailModal({ motor, onClose, onChanged, genPDF, isAdminUser, onDe
               <button className="btn btn-primary" onClick={async () => {
                 try {
                   const payload = { enteredByNameOverride: partEditForm.enteredByNameOverride || null };
-                  if (partEditForm.enteredAtOverride) payload.enteredAtOverride = partEditForm.enteredAtOverride;
+                  const toISO = dt => dt ? new Date(dt).toISOString() : null;
+                  if (partEditForm.enteredAtOverride) payload.enteredAtOverride = toISO(partEditForm.enteredAtOverride);
                   await adminEditMotorPart(motor.id, partEditTarget.partId, payload);
                   toast.success('Güncellendi');
                   onChanged();

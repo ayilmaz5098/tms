@@ -859,9 +859,10 @@ export default function StepCard({ rotor, section, stepDef, stepState = {}, prev
               onClick={async () => {
                 setLoad(true);
                 try {
+                  const toISO = dt => dt ? new Date(dt).toISOString() : null;
                   const payload = {};
-                  if (adminEditForm.startedAt)            payload.startedAt = adminEditForm.startedAt;
-                  if (adminEditForm.completedAt)          payload.completedAt = adminEditForm.completedAt;
+                  if (adminEditForm.startedAt)            payload.startedAt = toISO(adminEditForm.startedAt);
+                  if (adminEditForm.completedAt)          payload.completedAt = toISO(adminEditForm.completedAt);
                   payload.operatorNameOverride = adminEditForm.operatorNameOverride || null;
                   await adminEditStep(rotor.id, section, stepDef.num, payload);
                   toast.success('Tarih/isim güncellendi');

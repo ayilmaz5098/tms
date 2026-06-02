@@ -377,6 +377,13 @@ router.patch('/:rotorId/:section/:step/admin-edit', auth, requireRole('admin'), 
       vals
     );
 
+    // Recalculate duration_min from the updated started_at / completed_at
+    await client.query(
+      `UPDATE step_states SET duration_min = ROUND(EXTRACT(EPOCH FROM (completed_at - started_at)) / 60)
+       WHERE id=$1 AND started_at IS NOT NULL AND completed_at IS NOT NULL`,
+      [ss.id]
+    );
+
     const rotor = await getRotor(client, rotorId);
     await addAudit(client, req.user.id, req.user.name, 'ADMIN_EDIT', rotorId, rotor?.serial_no, section, step,
       `Tarih/isim düzenlendi: ${JSON.stringify({ startedAt, completedAt, operatorNameOverride })}`);
