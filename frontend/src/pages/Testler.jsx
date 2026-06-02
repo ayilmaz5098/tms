@@ -10,6 +10,16 @@ import tmsLogo from '../tmslogo.jpeg';
 
 function today() { return new Date().toLocaleDateString('tr-TR'); }
 function fmtDate(dt) { return dt ? new Date(dt).toLocaleDateString('tr-TR') : '—'; }
+function fmtDateTime(dt) {
+  if (!dt) return '—';
+  return new Date(dt).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+function calcDuration(start, end) {
+  if (!start || !end) return '—';
+  const mins = Math.round((new Date(end) - new Date(start)) / 60000);
+  if (mins < 60) return `${mins} dk`;
+  return `${Math.floor(mins / 60)} sa ${mins % 60} dk`;
+}
 
 export default function Testler() {
   const [sp] = useSearchParams();
@@ -32,8 +42,11 @@ export default function Testler() {
 
   function openReport(type) {
     if (!motor) return;
-    const html = type === 'checklist' ? genChecklist(motor, tests) : genCert(motor, tests);
-    setPreview({ title: `${motor.motor_sn} — ${type === 'checklist' ? 'Teknik Kontrol Listesi' : 'KOM-TUR-FRM-071 Denetim Sertifikası'}`, html });
+    let html, title;
+    if (type === 'checklist') { html = genChecklist(motor, tests); title = 'Teknik Kontrol Listesi'; }
+    else if (type === 'cert') { html = genCert(motor, tests); title = 'KOM-TUR-FRM-071 Denetim Sertifikası'; }
+    else { html = genTimingReport(motor, tests); title = 'Motor Test Süre Raporu'; }
+    setPreview({ title: `${motor.motor_sn} — ${title}`, html });
   }
 
   return (
@@ -41,16 +54,11 @@ export default function Testler() {
       <div className="page-header">
         <h1 className="page-title">MOTOR TESTLERİ</h1>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          {motorId && allDone && (
-            <>
-              <button className="btn btn-ghost btn-sm" onClick={() => openReport('checklist')}>📄 Teknik Kontrol Listesi</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => openReport('cert')}>📋 Denetim Sertifikası</button>
-            </>
-          )}
           {motorId && (
             <>
-              <button className="btn btn-ghost btn-sm" onClick={() => openReport('checklist')}>👁 Önizle: Kontrol Listesi</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => openReport('cert')}>👁 Önizle: Sertifika</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => openReport('checklist')}>📄 Kontrol Listesi</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => openReport('cert')}>📋 Denetim Sertifikası</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => openReport('timing')}>⏱ Süre Raporu</button>
             </>
           )}
         </div>
@@ -718,6 +726,109 @@ export function genChecklist(motor, tests) {
       <td style="text-align:center;">${v(ea45,'leakage_1k6')}</td>
       <td class="gray" style="text-align:center;">500</td>
     </tr>
+  </table>
+
+  <div class="sig">
+    <div class="sig-box"><strong>TESTİ YAPAN (TESTED BY):</strong><br><br>___________________</div>
+    <div class="sig-box"><strong>ONAYLAYAN (APPROVED BY):</strong><br><br>___________________</div>
+    <div class="sig-box"><strong>NOT (NOTE):</strong><br><br></div>
+  </div>`;
+}
+
+// ─── Motor Test Süre Raporu ───────────────────────────────
+function genTimingReport(motor, tests) {
+  const statorSn = motor.parts?.find(p => p.part_name === 'Stator Seri Numarası')?.serial_number || motor.stator_sn || '—';
+  const rotorSn  = motor.rotor_sn || motor.motor_sn || '—';
+
+  const byCode = Object.fromEntries(tests.map(t => [t.step_code, t]));
+
+  const totalStarted  = tests.reduce((min, t) => t.started_at  && (!min || new Date(t.started_at)  < new Date(min)) ? t.started_at  : min, null);
+  const totalFinished = tests.reduce((max, t) => t.completed_at && (!max || new Date(t.completed_at) > new Date(max)) ? t.completed_at : max, null);
+
+  const rows = MOTOR_TEST_STEPS.map(step => {
+    const t = byCode[step.code];
+    const statusLabel = !t || t.status === 'not_started' ? 'Başlanmadı'
+      : t.status === 'in_progress' ? 'Devam Ediyor'
+      : 'Tamamlandı';
+    const statusColor = !t || t.status === 'not_started' ? '#888'
+      : t.status === 'in_progress' ? '#c07000'
+      : '#1a7a1a';
+    return `<tr>
+      <td style="font-family:monospace;font-weight:bold;">${step.code}</td>
+      <td>${step.name.split('—')[1]?.trim() || step.name}</td>
+      <td style="text-align:center;color:${statusColor};font-weight:bold;">${statusLabel}</td>
+      <td style="text-align:center;font-family:monospace;">${fmtDateTime(t?.started_at)}</td>
+      <td style="text-align:center;font-family:monospace;">${t?.started_by_name || (t?.started_at ? '—' : '')}</td>
+      <td style="text-align:center;font-family:monospace;">${fmtDateTime(t?.completed_at)}</td>
+      <td style="text-align:center;font-family:monospace;">${t?.completed_by_name || (t?.completed_at ? '—' : '')}</td>
+      <td style="text-align:center;font-family:monospace;font-weight:bold;">${calcDuration(t?.started_at, t?.completed_at)}</td>
+    </tr>`;
+  }).join('');
+
+  const completedCount = MOTOR_TEST_STEPS.filter(s => byCode[s.code]?.status === 'completed').length;
+
+  return `<style>${CSS}
+  th { font-size: 10px; }
+  </style>
+  <table style="width:100%;border-collapse:collapse;border:2px solid #333;margin-bottom:8px;">
+    <tr>
+      <td rowspan="2" style="border:1px solid #333;padding:8px;width:100px;text-align:center;vertical-align:middle;">${LOGO_HTML}</td>
+      <td rowspan="2" style="border:1px solid #333;padding:12px;text-align:center;vertical-align:middle;">
+        <strong style="font-size:14px;">MOTOR TEST SÜRE RAPORU</strong><br>
+        <em style="font-size:11px;">MOTOR TEST TIMING REPORT</em>
+      </td>
+      <td style="border:1px solid #333;padding:4px 8px;font-size:10px;min-width:200px;">
+        <table style="border:none;margin:0;width:100%;">
+          <tr><td style="border:none;padding:2px 0;"><b>Doküman No</b></td><td style="border:none;padding:2px 0;text-align:right;">KOM-TUR-FRM-TR01</td></tr>
+          <tr><td style="border:none;padding:2px 0;"><b>Tarih</b></td><td style="border:none;padding:2px 0;text-align:right;">${today()}</td></tr>
+          <tr><td style="border:none;padding:2px 0;"><b>Sayfa</b></td><td style="border:none;padding:2px 0;text-align:right;">1/1</td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  <table style="width:100%;border-collapse:collapse;border:1px solid #333;border-top:none;margin-bottom:12px;">
+    <tr style="background:#d8d8d8;">
+      <td colspan="6" style="border:1px solid #333;padding:5px;font-weight:bold;">Motor Bilgileri (Motor Information)</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #333;padding:5px;"><b>MOTOR S/N:</b></td>
+      <td style="border:1px solid #333;padding:5px;font-family:monospace;font-weight:bold;">${motor.motor_sn}</td>
+      <td style="border:1px solid #333;padding:5px;"><b>ROTOR NU.:</b></td>
+      <td style="border:1px solid #333;padding:5px;font-family:monospace;font-weight:bold;">${rotorSn}</td>
+      <td style="border:1px solid #333;padding:5px;"><b>STATOR NU.:</b></td>
+      <td style="border:1px solid #333;padding:5px;font-family:monospace;font-weight:bold;">${statorSn}</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #333;padding:5px;"><b>Test Başlangıç:</b></td>
+      <td style="border:1px solid #333;padding:5px;font-family:monospace;">${fmtDateTime(totalStarted)}</td>
+      <td style="border:1px solid #333;padding:5px;"><b>Test Bitiş:</b></td>
+      <td style="border:1px solid #333;padding:5px;font-family:monospace;">${fmtDateTime(totalFinished)}</td>
+      <td style="border:1px solid #333;padding:5px;"><b>Toplam Süre:</b></td>
+      <td style="border:1px solid #333;padding:5px;font-family:monospace;font-weight:bold;">${calcDuration(totalStarted, totalFinished)}</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #333;padding:5px;"><b>Tamamlanan Adım:</b></td>
+      <td style="border:1px solid #333;padding:5px;font-family:monospace;font-weight:bold;">${completedCount} / ${MOTOR_TEST_STEPS.length}</td>
+      <td colspan="4" style="border:1px solid #333;padding:5px;"><b>Proje:</b> ${motor.project_name || '—'}</td>
+    </tr>
+  </table>
+
+  <table style="width:100%;border-collapse:collapse;border:1px solid #333;">
+    <thead>
+      <tr style="background:#1a3a6b;color:#fff;">
+        <th style="padding:5px 7px;">Adım Kodu</th>
+        <th style="padding:5px 7px;">Test Adı</th>
+        <th style="padding:5px 7px;text-align:center;">Durum</th>
+        <th style="padding:5px 7px;text-align:center;">Başlangıç Tarihi/Saati<br><em style="font-weight:normal;">Start Date/Time</em></th>
+        <th style="padding:5px 7px;text-align:center;">Başlatan<br><em style="font-weight:normal;">Started By</em></th>
+        <th style="padding:5px 7px;text-align:center;">Bitiş Tarihi/Saati<br><em style="font-weight:normal;">Finish Date/Time</em></th>
+        <th style="padding:5px 7px;text-align:center;">Tamamlayan<br><em style="font-weight:normal;">Completed By</em></th>
+        <th style="padding:5px 7px;text-align:center;">Süre<br><em style="font-weight:normal;">Duration</em></th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
   </table>
 
   <div class="sig">
