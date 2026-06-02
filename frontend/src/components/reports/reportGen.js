@@ -11,6 +11,7 @@ export const TALIMAT_URLS = {
 // ─── Helpers ─────────────────────────────────────────────
 function today() { return new Date().toLocaleDateString('tr-TR'); }
 function fmt(dt) { if (!dt) return '—'; return new Date(dt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }); }
+function fmtDT(dt) { if (!dt) return '—'; return new Date(dt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 function fmtDur(min) { if (!min) return '—'; return `${Math.floor(min/60)}sa ${min%60}dk`; }
 function ss(steps, section, num) { return steps?.find(s => s.section === section && s.step_number === num) || {}; }
 function mv(step, idx) { return step?.measurements?.[idx]; }
@@ -887,6 +888,11 @@ export function genEslikKarti(rotor, parts) {
 
 
 export function genMasterRecord(rotor, steps, currentUser) {
+  // Use the date of the last completed step, not today
+  const lastCompleted = steps
+    .map(s => s.completed_at).filter(Boolean).sort().pop();
+  const reportDate = lastCompleted ? new Date(lastCompleted).toLocaleDateString('tr-TR') : today();
+
   let html = `<div style="border:2px solid #1a3a6b;padding:10px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
     ${LOGO}
     <div style="flex:1;text-align:center;">
@@ -895,7 +901,7 @@ export function genMasterRecord(rotor, steps, currentUser) {
     </div>
     <div style="font-size:10px;text-align:right;">
       <div>Şaft No: <strong>${rotor.shaft_no||'—'}</strong></div>
-      <div>Tarih: <strong>${today()}</strong></div>
+      <div>Tarih: <strong>${reportDate}</strong></div>
       <div>Proje: <strong>2/BOZANKAYA</strong></div>
       <div>Oluşturan: <strong>${currentUser?.name||'—'}</strong></div>
     </div>
@@ -916,7 +922,7 @@ export function genMasterRecord(rotor, steps, currentUser) {
           <th colspan="5" style="text-align:left;">
             Adım ${s.num}: ${s.name}
             ${s.internalOnly?'<span style="color:#666;font-weight:normal;font-size:9px;"> (iç kayıt — forma eklenmez)</span>':''}
-            — Operatör: ${st.started_by_name||'—'} · ${fmt(st.started_at)} → ${fmt(st.completed_at)} · ${fmtDur(st.duration_min)}
+            — Operatör: ${st.operator_name_override||st.started_by_name||'—'} · ${fmtDT(st.started_at)} → ${fmtDT(st.completed_at)} · ${fmtDur(st.duration_min)}
           </th>
         </tr>`;
 
