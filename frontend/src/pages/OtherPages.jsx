@@ -287,7 +287,7 @@ export function Admin() {
                     <button className="btn btn-ghost btn-xs" onClick={() => { const pw = prompt('Yeni şifre (min 6):'); if (pw?.length >= 6) updateUser(u.id, { password: pw }).then(() => toast.success('Şifre güncellendi')); }}>
                       Şifre Sıfırla
                     </button>
-                    <button className="btn btn-red btn-xs" onClick={async () => { if (confirm(`${u.name} silinsin mi? Bu işlem geri alınamaz.`)) { await deleteUser(u.id); toast.success(`${u.name} silindi`); qc.invalidateQueries('users'); } }}>
+                    <button className="btn btn-red btn-xs" onClick={async () => { if (confirm(`${u.name} silinsin mi? Bu işlem geri alınamaz.`)) { try { await deleteUser(u.id); toast.success(`${u.name} silindi`); qc.invalidateQueries('users'); } catch(err) { toast.error(err.response?.data?.error || 'Silme hatası'); } } }}>
                       Sil
                     </button>
                   </div>
@@ -403,9 +403,11 @@ export function Documents() {
 
   async function handleDelete(id) {
     if (!confirm('Bu belgeyi silmek istiyor musunuz?')) return;
-    await deleteDocument(id);
-    toast.success('Silindi');
-    qc.invalidateQueries(['docs', activeTab]);
+    try {
+      await deleteDocument(id);
+      toast.success('Silindi');
+      qc.invalidateQueries(['docs', activeTab]);
+    } catch(err) { toast.error(err.response?.data?.error || 'Silme hatası'); }
   }
 
   return (
@@ -459,10 +461,10 @@ export function Documents() {
         <form id="doc-form" onSubmit={async e => {
           e.preventDefault();
           const fd = new FormData(e.target);
-          await createDocument({ title: fd.get('title'), category: fd.get('category'), url: fd.get('url') });
-          toast.success('Belge eklendi');
-          setAdd(false);
-          qc.invalidateQueries(['docs', activeTab]);
+          try {
+            await createDocument({ title: fd.get('title'), category: fd.get('category'), url: fd.get('url') });
+            toast.success('Belge eklendi'); setAdd(false); qc.invalidateQueries(['docs', activeTab]);
+          } catch(err) { toast.error(err.response?.data?.error || 'Belge eklenemedi'); }
         }}>
           <div className="fg"><label className="fl">Başlık</label><input className="fi" name="title" required placeholder="Belge adı" /></div>
           <div className="fg"><label className="fl">Kategori</label>
@@ -606,8 +608,10 @@ function genMotorPDF(motor) {
         footer={<><button className="btn btn-ghost" onClick={() => setAdd(false)}>İptal</button><button className="btn btn-primary" form="motor-form" type="submit">Ekle</button></>}>
         <form id="motor-form" onSubmit={async e => {
           e.preventDefault(); const fd = new FormData(e.target);
-          await createMotor({ motorSn: fd.get('motorSn'), projectId: fd.get('projectId')||null, notes: fd.get('notes') });
-          toast.success('Motor eklendi'); setAdd(false); qc.invalidateQueries('motors');
+          try {
+            await createMotor({ motorSn: fd.get('motorSn'), projectId: fd.get('projectId')||null, notes: fd.get('notes') });
+            toast.success('Motor eklendi'); setAdd(false); qc.invalidateQueries('motors');
+          } catch(err) { toast.error(err.response?.data?.error || 'Motor eklenemedi'); }
         }}>
           <div className="fg"><label className="fl">Proje</label>
             <select className="fs" name="projectId">

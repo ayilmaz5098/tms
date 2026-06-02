@@ -118,6 +118,7 @@ router.get('/:id/parts', auth, async (req, res) => {
 
 // POST /api/rotors/:id/parts/save — partial save with per-field timestamps
 router.post('/:id/parts/save', auth, requireRole('admin','operator','qc' ), async (req, res) => {
+  try {
   const b = req.body;
   // Accept both snake_case and camelCase
   const fields = {
@@ -178,6 +179,7 @@ router.post('/:id/parts/save', auth, requireRole('admin','operator','qc' ), asyn
      JSON.stringify(newTs), req.user.id]
   );
   res.json(rows[0]);
+  } catch(e) { console.error('parts/save error:', e.message); res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/rotors/:id/assemble — finalize rotor

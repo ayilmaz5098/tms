@@ -136,38 +136,42 @@ router.delete('/documents/:id', auth, requireRole('admin'), async (req, res) => 
 
 // ─── MOTORS ───
 router.get('/motors', auth, async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT m.*, p.name as project_name, r.serial_no as rotor_sn, u.name as created_by_name,
-            rp.field_timestamps
-     FROM motors m LEFT JOIN projects p ON p.id=m.project_id
-     LEFT JOIN rotors r ON r.id=m.rotor_id LEFT JOIN users u ON u.id=m.created_by
-     LEFT JOIN rotor_parts rp ON rp.rotor_id=m.rotor_id
-     ORDER BY m.created_at DESC`
-  );
-  const ids = rows.map(r => r.id);
-  let parts = [];
-  if (ids.length) {
-    const { rows: pr } = await pool.query(
-      `SELECT mp.*, u.name as entered_by_name FROM motor_parts mp
-       LEFT JOIN users u ON u.id=mp.entered_by WHERE mp.motor_id=ANY($1) ORDER BY mp.motor_id,mp.id`, [ids]
+  try {
+    const { rows } = await pool.query(
+      `SELECT m.*, p.name as project_name, r.serial_no as rotor_sn, u.name as created_by_name,
+              rp.field_timestamps
+       FROM motors m LEFT JOIN projects p ON p.id=m.project_id
+       LEFT JOIN rotors r ON r.id=m.rotor_id LEFT JOIN users u ON u.id=m.created_by
+       LEFT JOIN rotor_parts rp ON rp.rotor_id=m.rotor_id
+       ORDER BY m.created_at DESC`
     );
-    parts = pr;
-  }
-  const byMotor = {};
-  parts.forEach(p => { if (!byMotor[p.motor_id]) byMotor[p.motor_id]=[]; byMotor[p.motor_id].push(p); });
-  res.json(rows.map(r => ({ ...r, parts: byMotor[r.id]||[] })));
+    const ids = rows.map(r => r.id);
+    let parts = [];
+    if (ids.length) {
+      const { rows: pr } = await pool.query(
+        `SELECT mp.*, u.name as entered_by_name FROM motor_parts mp
+         LEFT JOIN users u ON u.id=mp.entered_by WHERE mp.motor_id=ANY($1) ORDER BY mp.motor_id,mp.id`, [ids]
+      );
+      parts = pr;
+    }
+    const byMotor = {};
+    parts.forEach(p => { if (!byMotor[p.motor_id]) byMotor[p.motor_id]=[]; byMotor[p.motor_id].push(p); });
+    res.json(rows.map(r => ({ ...r, parts: byMotor[r.id]||[] })));
+  } catch (e) { console.error('GET /motors error:', e.message); res.status(500).json({ error: e.message }); }
 });
 router.get('/motors/:id', auth, async (req, res) => {
-  const { rows: [motor] } = await pool.query(
-    `SELECT m.*, r.serial_no as rotor_sn, r.shaft_no FROM motors m
-     LEFT JOIN rotors r ON r.id=m.rotor_id WHERE m.id=$1`, [req.params.id]
-  );
-  if (!motor) return res.status(404).json({ error: 'Not found' });
-  const { rows: parts } = await pool.query(
-    `SELECT mp.*, u.name as entered_by_name FROM motor_parts mp
-     LEFT JOIN users u ON u.id=mp.entered_by WHERE mp.motor_id=$1 ORDER BY mp.id`, [req.params.id]
-  );
-  res.json({ ...motor, parts });
+  try {
+    const { rows: [motor] } = await pool.query(
+      `SELECT m.*, r.serial_no as rotor_sn, r.shaft_no FROM motors m
+       LEFT JOIN rotors r ON r.id=m.rotor_id WHERE m.id=$1`, [req.params.id]
+    );
+    if (!motor) return res.status(404).json({ error: 'Not found' });
+    const { rows: parts } = await pool.query(
+      `SELECT mp.*, u.name as entered_by_name FROM motor_parts mp
+       LEFT JOIN users u ON u.id=mp.entered_by WHERE mp.motor_id=$1 ORDER BY mp.id`, [req.params.id]
+    );
+    res.json({ ...motor, parts });
+  } catch (e) { console.error('GET /motors/:id error:', e.message); res.status(500).json({ error: e.message }); }
 });
 router.post('/motors', auth, requireRole('admin','operator'), async (req, res) => {
   const { projectId, motorSn, rotorId, notes } = req.body;
