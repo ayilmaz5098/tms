@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { getRotors, getRotorSteps, getRotorParts, getAuditLog, getOOTRecords, getUsers, createUser, updateUser, deleteUser, submitShift, getDashboard, getDocuments, createDocument, deleteDocument, uploadDocument, getMotors, createMotor, addMotorPart, lockMotor, updateMotor, deleteMotor, unlockMotor, getProjects, uploadPhoto, getMotorPhotos, uploadMotorPhoto, getStepMaterials } from '../lib/api.js';
+import { getRotors, getRotorSteps, getRotorParts, getAuditLog, getOOTRecords, getUsers, createUser, updateUser, deleteUser, submitShift, getDashboard, getDocuments, createDocument, deleteDocument, uploadDocument, getMotors, createMotor, addMotorPart, lockMotor, updateMotor, deleteMotor, unlockMotor, getProjects, uploadPhoto, getMotorPhotos, uploadMotorPhoto, getStepMaterials, adminEditMotorPart } from '../lib/api.js';
 import { useAuthStore } from '../store/auth.js';
 import { Badge, Modal, PageLoader, EmptyState, CtxBox } from '../components/shared/index.jsx';
 import { genPN70, genBrazAcc, genHardness, genRotorSonKontrol, genBrazingOncesiCard, genBrazingSonrasiCard, genBoyamaCard, genEslikKarti, genMasterRecord, printReport } from '../components/reports/reportGen.js';
@@ -534,8 +534,10 @@ function genMotorPDF(motor) {
     const partRows = MOTOR_PARTS_LIST.map(k => {
       const p   = motor.parts?.find(x => x.part_name === k);
       const key = FIELD_MAP[k];
-      const ts  = key && ft[key] ? new Date(ft[key]).toLocaleString('tr-TR') : '—';
-      return `<tr><td>${k}</td><td><b>${p?.serial_number||'—'}</b></td><td>${ts}</td><td>${p?.entered_by_name||'—'}</td></tr>`;
+      const rawTs = p?.entered_at_override || p?.entered_at || (key && ft[key]) || null;
+      const ts  = rawTs ? new Date(rawTs).toLocaleString('tr-TR') : '—';
+      const byName = p?.entered_by_name_override || p?.entered_by_name || '—';
+      return `<tr><td>${k}</td><td><b>${p?.serial_number||'—'}</b></td><td>${ts}</td><td>${byName}</td></tr>`;
     }).join('');
     const html = `<html><head><meta charset="UTF-8"><title>Motor — ${motor.motor_sn}</title>
     <style>body{font-family:Arial,sans-serif;font-size:12px;margin:24px;}table{width:100%;border-collapse:collapse;margin:8px 0;}td,th{border:1px solid #333;padding:6px 10px;}th{background:#e0e0e0;font-weight:bold;text-align:left;}h2{color:#1a3a6b;}</style>
@@ -650,6 +652,8 @@ function MotorDetailModal({ motor, onClose, onChanged, genPDF, isAdminUser, onDe
   const [locking, setLocking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editSn, setEditSn] = useState(motor.motor_sn);
+  const [partEditTarget, setPartEditTarget] = useState(null); // { partId, partName, enteredAt, enteredByNameOverride }
+  const [partEditForm, setPartEditForm] = useState({ enteredAtOverride: '', enteredByNameOverride: '' });
   const qc = useQueryClient();
   const isLocked = motor.status === 'locked';
   const allFilled = MOTOR_PARTS_LIST.every(k => parts[k]?.trim());
@@ -740,10 +744,20 @@ function MotorDetailModal({ motor, onClose, onChanged, genPDF, isAdminUser, onDe
       )}
 
       <table className="dt" style={{marginBottom:12}}>
-        <thead><tr><th>Malzeme</th><th>Seri Numarası</th>{!isLocked&&<th style={{width:80}}></th>}</tr></thead>
+        <thead><tr>
+          <th>Malzeme</th>
+          <th>Seri Numarası</th>
+          <th>Kaydedilme Tarihi</th>
+          <th>Kaydeden</th>
+          {(!isLocked || isAdminUser) && <th style={{width:isAdminUser?110:80}}></th>}
+        </tr></thead>
         <tbody>
           {MOTOR_PARTS_LIST.map(k => {
             const saved = motor.parts?.find(x => x.part_name === k);
+            const displayDate = saved
+              ? new Date(saved.entered_at_override || saved.entered_at).toLocaleString('tr-TR')
+              : '—';
+            const displayName = saved?.entered_by_name_override || saved?.entered_by_name || '—';
             return (
               <tr key={k}>
                 <td style={{fontFamily:'var(--mono)',fontSize:11}}>{k}</td>
@@ -757,14 +771,75 @@ function MotorDetailModal({ motor, onClose, onChanged, genPDF, isAdminUser, onDe
                       onChange={e=>setParts(p=>({...p,[k]:e.target.value}))} />
                   )}
                 </td>
-                {!isLocked && (
-                  <td><button className="btn btn-blue btn-xs" disabled={saving||!parts[k]?.trim()} onClick={()=>handleSavePart(k)}>Kaydet</button></td>
+                <td style={{fontSize:10,color:'var(--text3)',fontFamily:'var(--mono)'}}>{displayDate}</td>
+                <td style={{fontSize:10,color:'var(--text3)'}}>{displayName}</td>
+                {(!isLocked || isAdminUser) && (
+                  <td>
+                    <div style={{display:'flex',gap:4}}>
+                      {!isLocked && <button className="btn btn-blue btn-xs" disabled={saving||!parts[k]?.trim()} onClick={()=>handleSavePart(k)}>Kaydet</button>}
+                      {isAdminUser && saved?.id && (
+                        <button className="btn btn-ghost btn-xs" style={{color:'var(--orange)'}}
+                          onClick={() => {
+                            const toLocal = dt => {
+                              if (!dt) return '';
+                              const d = new Date(dt);
+                              const pad = n => String(n).padStart(2,'0');
+                              return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                            };
+                            setPartEditForm({
+                              enteredAtOverride: toLocal(saved.entered_at_override || saved.entered_at),
+                              enteredByNameOverride: saved.entered_by_name_override || '',
+                            });
+                            setPartEditTarget({ partId: saved.id, partName: k });
+                          }}>
+                          🗓
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 )}
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      {/* Admin part date/name edit modal */}
+      {partEditTarget && (
+        <Modal open={true} onClose={() => setPartEditTarget(null)} title={`TARİH / İSİM DÜZENLE — ${partEditTarget.partName}`} narrow
+          footer={
+            <>
+              <button className="btn btn-ghost" onClick={() => setPartEditTarget(null)}>İptal</button>
+              <button className="btn btn-primary" onClick={async () => {
+                try {
+                  const payload = { enteredByNameOverride: partEditForm.enteredByNameOverride || null };
+                  if (partEditForm.enteredAtOverride) payload.enteredAtOverride = partEditForm.enteredAtOverride;
+                  await adminEditMotorPart(motor.id, partEditTarget.partId, payload);
+                  toast.success('Güncellendi');
+                  onChanged();
+                  setPartEditTarget(null);
+                } catch(e) { toast.error(e.response?.data?.error || 'Güncelleme hatası'); }
+              }}>💾 Kaydet</button>
+            </>
+          }>
+          <div style={{fontSize:11,color:'var(--orange)',background:'var(--bg3)',padding:'8px 12px',borderRadius:'var(--r)',marginBottom:12}}>
+            ⚠ Değişiklikler raporda görünür ve denetim izine kaydedilir.
+          </div>
+          <div className="fg">
+            <label className="fl">Kaydedilme Tarihi</label>
+            <input type="datetime-local" className="fi"
+              value={partEditForm.enteredAtOverride}
+              onChange={e => setPartEditForm(f => ({...f, enteredAtOverride: e.target.value}))} />
+          </div>
+          <div className="fg">
+            <label className="fl">Kaydeden (Geçersiz Kıl)</label>
+            <input type="text" className="fi"
+              value={partEditForm.enteredByNameOverride}
+              onChange={e => setPartEditForm(f => ({...f, enteredByNameOverride: e.target.value}))}
+              placeholder="Boş bırakırsa asıl kullanıcı adı kullanılır" />
+          </div>
+        </Modal>
+      )}
 
       <div style={{borderTop:'1px solid var(--border)',paddingTop:10}}>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>

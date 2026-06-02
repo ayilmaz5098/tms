@@ -207,6 +207,25 @@ router.post('/motors/:id/parts', auth, async (req, res) => {
   );
   res.status(201).json(rows[0]);
 });
+
+// PATCH /api/motors/:motorId/parts/:partId/admin-edit  — admin only
+router.patch('/motors/:motorId/parts/:partId/admin-edit', auth, requireRole('admin'), async (req, res) => {
+  const { enteredAtOverride, enteredByNameOverride } = req.body;
+  const updates = [];
+  const vals = [];
+  let idx = 1;
+  if (enteredAtOverride !== undefined)      { updates.push(`entered_at_override=$${idx++}`);       vals.push(enteredAtOverride || null); }
+  if (enteredByNameOverride !== undefined)  { updates.push(`entered_by_name_override=$${idx++}`);  vals.push(enteredByNameOverride || null); }
+  if (updates.length === 0) return res.status(400).json({ error: 'Güncellenecek alan yok' });
+  vals.push(req.params.partId, req.params.motorId);
+  const { rows } = await pool.query(
+    `UPDATE motor_parts SET ${updates.join(', ')} WHERE id=$${idx} AND motor_id=$${idx+1} RETURNING *`,
+    vals
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Parça bulunamadı' });
+  res.json(rows[0]);
+});
+
 router.post('/motors/:id/lock', auth, requireRole('admin','operator'), async (req, res) => {
   const { rows } = await pool.query('UPDATE motors SET status=$1 WHERE id=$2 RETURNING *', ['locked', req.params.id]);
   res.json(rows[0]);

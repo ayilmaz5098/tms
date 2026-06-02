@@ -11,3 +11,7 @@ ALTER TABLE rotor_parts ADD COLUMN IF NOT EXISTS fan_sn         VARCHAR(100);
 ALTER TABLE rotor_parts ADD COLUMN IF NOT EXISTS kaplin_sn      VARCHAR(100);
 ALTER TABLE rotor_parts ADD COLUMN IF NOT EXISTS enkoder_sn     VARCHAR(100);
 ALTER TABLE rotor_parts ADD COLUMN IF NOT EXISTS field_timestamps JSONB DEFAULT '{}';
+
+-- Admin override fields for motor_parts (retroactive date/name editing)
+ALTER TABLE motor_parts ADD COLUMN IF NOT EXISTS entered_at_override TIMESTAMPTZ;
+ALTER TABLE motor_parts ADD COLUMN IF NOT EXISTS entered_by_name_override VARCHAR(200);
