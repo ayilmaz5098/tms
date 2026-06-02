@@ -350,3 +350,39 @@ router.post('/:rotorId/:section/:step/toggle-qc', auth, async (req, res) => {
     res.json(rows[0]);
   } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 });
+
+// PATCH /api/steps/:rotorId/:section/:step/admin-edit  — admin only
+// Allows overriding dates and operator name for historical/retroactive entries
+router.patch('/:rotorId/:section/:step/admin-edit', auth, requireRole('admin'), async (req, res) => {
+  const { rotorId, section, step } = req.params;
+  const { startedAt, completedAt, operatorNameOverride } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [ss] } = await client.query(
+      'SELECT * FROM step_states WHERE rotor_id=$1 AND section=$2 AND step_number=$3',
+      [rotorId, section, parseInt(step)]
+    );
+    if (!ss) return res.status(404).json({ error: 'Adım bulunamadı' });
+
+    const updates = [];
+    const vals = [];
+    let idx = 1;
+    if (startedAt !== undefined)            { updates.push(`started_at=$${idx++}`);              vals.push(startedAt || null); }
+    if (completedAt !== undefined)          { updates.push(`completed_at=$${idx++}`);            vals.push(completedAt || null); }
+    if (operatorNameOverride !== undefined) { updates.push(`operator_name_override=$${idx++}`);  vals.push(operatorNameOverride || null); }
+    if (updates.length === 0) return res.status(400).json({ error: 'Güncellenecek alan yok' });
+
+    vals.push(ss.id);
+    const { rows } = await client.query(
+      `UPDATE step_states SET ${updates.join(', ')} WHERE id=$${idx} RETURNING *`,
+      vals
+    );
+
+    const rotor = await getRotor(client, rotorId);
+    await addAudit(client, req.user.id, req.user.name, 'ADMIN_EDIT', rotorId, rotor?.serial_no, section, step,
+      `Tarih/isim düzenlendi: ${JSON.stringify({ startedAt, completedAt, operatorNameOverride })}`);
+    await client.query('COMMIT');
+    res.json(rows[0]);
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+});

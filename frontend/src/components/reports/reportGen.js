@@ -27,6 +27,11 @@ function checkStr(step, idx) {
   if (!m) return { ok: '☐', red: '☐' };
   return m.actual_value >= 1 ? { ok: '✓', red: '☐' } : { ok: '☐', red: '✗' };
 }
+// Returns operator_name_override if set, otherwise falls back to qc/completed/started name
+function opName(step) {
+  return step?.operator_name_override || step?.qc_by_name || step?.completed_by_name || step?.started_by_name || '—';
+}
+function fmtDate(dt) { return dt ? new Date(dt).toLocaleDateString('tr-TR') : '—'; }
 
 // Logo for reports — uses the public-served file
 const LOGO = `<img src="/tmslogo.jpeg" alt="TMS" style="height:42px;width:auto;" onerror="this.style.display='none'"/>`;
@@ -64,7 +69,7 @@ function formHeader(titleTr, titleEn, docNo, shaft, date, extraInfo) {
         <div class="info-row"><span>Doküman No./Doc No.</span><strong>${docNo}</strong></div>
         <div class="info-row"><span>Versiyon / Version</span><strong>00/</strong></div>
         <div class="info-row"><span>Sayfa No / page</span><strong>1/1</strong></div>
-        <div class="info-row"><span>Gözden Geçirme Tarihi</span><strong>${today()}</strong></div>
+        <div class="info-row"><span>Gözden Geçirme Tarihi</span><strong>18.02.2026</strong></div>
       </td>
     </tr>
   </table>
@@ -146,7 +151,7 @@ export function genPN70(rotor, steps) {
       <em style="font-size:10px;">Preparation for layering: cleaning of press plates and placement area, placement of the central shaft into the lower press plate, angle check.</em></td>
       <td style="text-align:center;font-size:16px;" class="${s2check.ok==='✓'?'ok':''}">${s2check.ok}</td>
       <td style="text-align:center;" class="${s2check.red==='✗'?'oot':''}">${s2check.red}</td>
-      <td style="font-size:10px;">${ss2.completed_at?new Date(ss2.completed_at).toLocaleDateString('tr-TR'):'—'}<br>${ss2.qc_by_name||ss2.completed_by_name||'—'}</td>
+      <td style="font-size:10px;">${fmtDate(ss2.completed_at)}<br>${opName(ss2)}</td>
     </tr>
     <!-- Row 2: Step 3 with 4 measurements -->
     <tr>
@@ -174,7 +179,7 @@ export function genPN70(rotor, steps) {
       </td>
       <td style="text-align:center;font-size:16px;" class="${s3check.ok==='✓'&&s3allOk?'ok':''}">${s3check.ok}</td>
       <td style="text-align:center;" class="${s3check.red==='✗'?'oot':''}">${s3check.red}</td>
-      <td style="font-size:10px;">${ss3.completed_at?new Date(ss3.completed_at).toLocaleDateString('tr-TR'):'—'}<br>${ss3.qc_by_name||'—'}</td>
+      <td style="font-size:10px;">${fmtDate(ss3.completed_at)}<br>${opName(ss3)}</td>
     </tr>
     <!-- Rows 3-7: Step 5 checklist items -->
     ${CHECKLIST_LABELS.map((item,i) => {
@@ -183,7 +188,7 @@ export function genPN70(rotor, steps) {
         <td>- ${item.tr}<br><em style="font-size:10px;">${item.en}</em></td>
         <td style="text-align:center;font-size:16px;" class="${chk.ok==='✓'?'ok':''}">${chk.ok}</td>
         <td style="text-align:center;" class="${chk.red==='✗'?'oot':''}">${chk.red}</td>
-        <td style="font-size:10px;">${ss5.completed_at?new Date(ss5.completed_at).toLocaleDateString('tr-TR'):'—'}<br>${ss5.qc_by_name||ss5.completed_by_name||'—'}</td>
+        <td style="font-size:10px;">${fmtDate(ss5.completed_at)}<br>${opName(ss5)}</td>
       </tr>`;
     }).join('')}
   </table>
@@ -191,7 +196,7 @@ export function genPN70(rotor, steps) {
     <strong>Not:</strong> Eğer değerlendirme "RED" ise, Açıklama Teknoloji / Kalite tarafından yapılır.<br>
     <em>Note: If the evaluation is "RED", the explanation will be provided by Technology/Quality.</em>
   </div>
-  ${sigArea(ss5.qc_by_name||ss3.qc_by_name||'')}`;
+  ${sigArea(opName(ss5)||opName(ss3)||'')}`;
 
   return html;
 }
@@ -256,10 +261,10 @@ export function genBrazAcc(rotor, steps) {
   </table>
 
   <div style="font-size:10px;margin-bottom:8px;">
-    <strong>İsim İmza/Name Signature:</strong> &nbsp;&nbsp; ${ss6.qc_by_name||ss6.started_by_name||'—'}
+    <strong>İsim İmza/Name Signature:</strong> &nbsp;&nbsp; ${opName(ss6)}
     &nbsp;&nbsp;&nbsp; <strong>Ekipman:</strong> ${mv(ss6,0)?.equipment||'—'}
   </div>
-  ${sigArea(ss6.qc_by_name||'')}`;
+  ${sigArea(opName(ss6))}`;
 
   return html;
 }
@@ -319,9 +324,9 @@ export function genHardness(rotor, steps) {
   </div>
 
   <div style="font-size:10px;margin-bottom:8px;">
-    <strong>İmza/signature:</strong> &nbsp;&nbsp; ${ss1.qc_by_name||'—'}
+    <strong>İmza/signature:</strong> &nbsp;&nbsp; ${opName(ss1)}
   </div>
-  ${sigArea('')}`;
+  ${sigArea(opName(ss1))}`;
 
   return html;
 }
@@ -408,9 +413,9 @@ export function genRotorSonKontrol(rotor, steps) {
   </table>
 
   <div style="font-size:10px;margin-bottom:8px;">
-    <strong>İsim İmza/Name Signature:</strong> &nbsp;&nbsp; ${ss4.started_by_name||'—'}
+    <strong>İsim İmza/Name Signature:</strong> &nbsp;&nbsp; ${opName(ss4)}
   </div>
-  ${sigArea('')}`;
+  ${sigArea(opName(ss4))}`;
 
   return html;
 }

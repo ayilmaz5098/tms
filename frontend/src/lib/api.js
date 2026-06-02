@@ -64,6 +64,7 @@ export const completeStep   = (r, sec, n, note) => s(r, sec, n, 'complete', { no
 export const qcApprove      = (r, sec, n, note) => s(r, sec, n, 'qc-approve', { note });
 export const qcReject       = (r, sec, n, note) => s(r, sec, n, 'qc-reject', { note });
 export const reworkStep     = (r, sec, n)       => s(r, sec, n, 'rework');
+export const adminEditStep  = (r, sec, n, data) => api.patch(`/steps/${r}/${sec}/${n}/admin-edit`, data);
 export const saveMeasurements = (r, sec, n, measurements, equipment) =>
   api.post(`/steps/${r}/${sec}/${n}/measurements`, { measurements, equipment });
 
@@ -126,6 +127,7 @@ export const getMotorTests         = (motorId)            => api.get(`/motors/${
 export const startMotorTest        = (motorId, stepCode)  => api.post(`/motors/${motorId}/tests/${stepCode}/start`);
 export const saveMotorTest         = (motorId, stepCode, data) => api.post(`/motors/${motorId}/tests/${stepCode}/save`, { data });
 export const completeMotorTest     = (motorId, stepCode, data) => api.post(`/motors/${motorId}/tests/${stepCode}/complete`, { data });
+export const adminEditMotorTest    = (motorId, stepCode, data) => api.patch(`/motors/${motorId}/tests/${stepCode}/admin-edit`, data);
 
 export const getStepDrawings   = (section, step) => api.get(`/step-drawings/${section}/${step}`);
 export const addStepDrawing    = (section, step, data) => api.post(`/step-drawings/${section}/${step}`, data);

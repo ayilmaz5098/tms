@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { getMotors, getMotorTests, startMotorTest, saveMotorTest, completeMotorTest } from '../lib/api.js';
+import { getMotors, getMotorTests, startMotorTest, saveMotorTest, completeMotorTest, adminEditMotorTest } from '../lib/api.js';
 import { useAuthStore } from '../store/auth.js';
 import { MOTOR_TEST_STEPS } from '../lib/motorTestDefs.js';
 import { Modal } from '../components/shared/index.jsx';
@@ -176,6 +176,8 @@ function TestStepPanel({ step, test, motorId, onSaved, isAdmin, currentUser }) {
     return init;
   });
   const [saving, setSaving] = useState(false);
+  const [adminEditOpen, setAdminEditOpen] = useState(false);
+  const [adminEditForm, setAdminEditForm] = useState({ startedAt: '', completedAt: '', operatorNameOverride: '' });
 
   function set(key, val) { setLocalData(d => ({ ...d, [key]: val })); }
   function setNested(outerKey, innerKey, val) {
@@ -219,7 +221,7 @@ function TestStepPanel({ step, test, motorId, onSaved, isAdmin, currentUser }) {
         <div style={{ fontSize: 11, color: 'var(--text3)', fontStyle: 'italic' }}>{step.nameEn}</div>
         {isCompleted && (
           <div style={{ marginTop: 8, fontSize: 11, color: 'var(--green)', fontFamily: 'var(--mono)' }}>
-            ✓ Tamamlandı — {test.completed_by_name} · {fmtDate(test.completed_at)}
+            ✓ Tamamlandı — {test.operator_name_override || test.completed_by_name} · {fmtDate(test.completed_at)}
           </div>
         )}
       </div>
@@ -385,10 +387,75 @@ function TestStepPanel({ step, test, motorId, onSaved, isAdmin, currentUser }) {
             </div>
           )}
           {isCompleted && isAdmin && (
-            <button className="btn btn-ghost btn-xs" style={{ marginTop: 12 }} onClick={handleRework}>↩ Geri Aç</button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button className="btn btn-ghost btn-xs" onClick={handleRework}>↩ Geri Aç</button>
+              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--orange)' }}
+                onClick={() => {
+                  const toLocal = (dt) => {
+                    if (!dt) return '';
+                    const d = new Date(dt);
+                    const pad = n => String(n).padStart(2, '0');
+                    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                  };
+                  setAdminEditForm({
+                    startedAt: toLocal(test?.started_at),
+                    completedAt: toLocal(test?.completed_at),
+                    operatorNameOverride: test?.operator_name_override || '',
+                  });
+                  setAdminEditOpen(true);
+                }}>
+                🗓 Tarih/İsim Düzenle
+              </button>
+            </div>
           )}
         </>
       )}
+
+      {/* Admin date/name edit modal */}
+      <Modal open={adminEditOpen} onClose={() => setAdminEditOpen(false)} title="TARİH / İSİM DÜZENLE (YÖNETİCİ)" narrow
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setAdminEditOpen(false)}>İptal</button>
+            <button className="btn btn-primary"
+              onClick={async () => {
+                try {
+                  const payload = {};
+                  if (adminEditForm.startedAt)   payload.startedAt = adminEditForm.startedAt;
+                  if (adminEditForm.completedAt) payload.completedAt = adminEditForm.completedAt;
+                  payload.operatorNameOverride = adminEditForm.operatorNameOverride || null;
+                  await adminEditMotorTest(motorId, step.code, payload);
+                  toast.success('Güncellendi');
+                  onSaved();
+                  setAdminEditOpen(false);
+                } catch(e) { toast.error(e.response?.data?.error || 'Güncelleme hatası'); }
+              }}>
+              💾 Kaydet
+            </button>
+          </>
+        }>
+        <div style={{ fontSize: 11, color: 'var(--orange)', background: 'var(--bg3)', padding: '8px 12px', borderRadius: 'var(--r)', marginBottom: 12 }}>
+          ⚠ Değişiklikler raporlara yansır ve denetim günlüğüne kaydedilir.
+        </div>
+        <div className="fg">
+          <label className="fl">Başlangıç Tarihi/Saati</label>
+          <input type="datetime-local" className="fi"
+            value={adminEditForm.startedAt}
+            onChange={e => setAdminEditForm(f => ({ ...f, startedAt: e.target.value }))} />
+        </div>
+        <div className="fg">
+          <label className="fl">Bitiş Tarihi/Saati</label>
+          <input type="datetime-local" className="fi"
+            value={adminEditForm.completedAt}
+            onChange={e => setAdminEditForm(f => ({ ...f, completedAt: e.target.value }))} />
+        </div>
+        <div className="fg">
+          <label className="fl">Operatör Adı (Geçersiz Kıl)</label>
+          <input type="text" className="fi"
+            value={adminEditForm.operatorNameOverride}
+            onChange={e => setAdminEditForm(f => ({ ...f, operatorNameOverride: e.target.value }))}
+            placeholder="Boş bırakırsa asıl kullanıcı adı kullanılır" />
+        </div>
+      </Modal>
     </div>
   );
 }

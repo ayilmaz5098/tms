@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from 'react-query';
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/auth.js';
-import { startStep, pauseStep, resumeStep, requestQC, completeStep, qcApprove, qcReject, reworkStep, editMeasurement, saveMeasurements, toggleQC, getStepMaterials, addStepMaterial, deleteStepMaterial, getStepDrawings, addStepDrawing, deleteStepDrawing, getStepEquipment, addStepEquipment, deleteStepEquipment, getStepTolerances, saveStepTolerance, deleteStepTolerance } from '../../lib/api.js';
+import { startStep, pauseStep, resumeStep, requestQC, completeStep, qcApprove, qcReject, reworkStep, adminEditStep, editMeasurement, saveMeasurements, toggleQC, getStepMaterials, addStepMaterial, deleteStepMaterial, getStepDrawings, addStepDrawing, deleteStepDrawing, getStepEquipment, addStepEquipment, deleteStepEquipment, getStepTolerances, saveStepTolerance, deleteStepTolerance } from '../../lib/api.js';
 import { fmtDuration } from '../../lib/stepDefs.js';
 import { TALIMAT_URLS } from '../reports/reportGen.js';
 import { Badge, CtxBox, Modal } from '../shared/index.jsx';
@@ -490,8 +490,9 @@ export default function StepCard({ rotor, section, stepDef, stepState = {}, prev
   const { user, isAdmin, isQC } = useAuthStore();
   const [open,   setOpen]   = useState(false);
   const [loading, setLoad]  = useState(false);
-  const [modal, setModal]   = useState(null); // 'complete'|'qc'|'rework'
+  const [modal, setModal]   = useState(null); // 'complete'|'qc'|'rework'|'admin-edit'
   const [noteVal, setNote]  = useState('');
+  const [adminEditForm, setAdminEditForm] = useState({ startedAt: '', completedAt: '', operatorNameOverride: '' });
 
   const st = stepState;
   // Effective QC: admin can override via st.qc_required
@@ -730,6 +731,25 @@ export default function StepCard({ rotor, section, stepDef, stepState = {}, prev
                   <button className="btn btn-ghost btn-xs" style={{ marginLeft: 'auto' }}
                     onClick={() => setModal('rework')}>↩ Geri Aç (Rework)</button>
                 )}
+                {isAdmin() && status !== 'not_started' && (
+                  <button className="btn btn-ghost btn-xs" style={{ color: 'var(--orange)' }}
+                    onClick={() => {
+                      const toLocal = (dt) => {
+                        if (!dt) return '';
+                        const d = new Date(dt);
+                        const pad = n => String(n).padStart(2, '0');
+                        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                      };
+                      setAdminEditForm({
+                        startedAt: toLocal(st.started_at),
+                        completedAt: toLocal(st.completed_at),
+                        operatorNameOverride: st.operator_name_override || '',
+                      });
+                      setModal('admin-edit');
+                    }}>
+                    🗓 Tarih/İsim Düzenle
+                  </button>
+                )}
 
                 <button className="btn btn-ghost btn-xs"
                   onClick={() => onPhotoClick?.()}>
@@ -828,6 +848,55 @@ export default function StepCard({ rotor, section, stepDef, stepState = {}, prev
         <CtxBox type="warn" icon="⚠" title="Dikkat">
           Yalnızca bu adım sıfırlanacak. Sonraki adımlar etkilenmez.
         </CtxBox>
+      </Modal>
+
+      {/* Admin date/name edit modal */}
+      <Modal open={modal === 'admin-edit'} onClose={() => setModal(null)} title="TARİH / İSİM DÜZENLE (YÖNETİCİ)" narrow
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setModal(null)}>İptal</button>
+            <button className="btn btn-primary" disabled={loading}
+              onClick={async () => {
+                setLoad(true);
+                try {
+                  const payload = {};
+                  if (adminEditForm.startedAt)            payload.startedAt = adminEditForm.startedAt;
+                  if (adminEditForm.completedAt)          payload.completedAt = adminEditForm.completedAt;
+                  payload.operatorNameOverride = adminEditForm.operatorNameOverride || null;
+                  await adminEditStep(rotor.id, section, stepDef.num, payload);
+                  toast.success('Tarih/isim güncellendi');
+                  onRefresh();
+                  setModal(null);
+                } catch (e) {
+                  toast.error(e.response?.data?.error || 'Güncelleme hatası');
+                } finally { setLoad(false); }
+              }}>
+              💾 Kaydet
+            </button>
+          </>
+        }>
+        <CtxBox type="warn" icon="⚠" title="Dikkat">
+          Bu değişiklikler raporlarda ve kayıtlarda görünecektir. Değişiklikler denetim günlüğüne kaydedilir.
+        </CtxBox>
+        <div className="fg">
+          <label className="fl">Başlangıç Tarihi/Saati</label>
+          <input type="datetime-local" className="fi"
+            value={adminEditForm.startedAt}
+            onChange={e => setAdminEditForm(f => ({ ...f, startedAt: e.target.value }))} />
+        </div>
+        <div className="fg">
+          <label className="fl">Bitiş Tarihi/Saati</label>
+          <input type="datetime-local" className="fi"
+            value={adminEditForm.completedAt}
+            onChange={e => setAdminEditForm(f => ({ ...f, completedAt: e.target.value }))} />
+        </div>
+        <div className="fg">
+          <label className="fl">Operatör Adı (Geçersiz Kıl)</label>
+          <input type="text" className="fi"
+            value={adminEditForm.operatorNameOverride}
+            onChange={e => setAdminEditForm(f => ({ ...f, operatorNameOverride: e.target.value }))}
+            placeholder="Boş bırakırsa asıl kullanıcı adı kullanılır" />
+        </div>
       </Modal>
     </>
   );

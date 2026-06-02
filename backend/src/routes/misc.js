@@ -579,3 +579,25 @@ router.post('/motors/:motorId/tests/:stepCode/complete', auth, async (req, res) 
   );
   res.json(rows[0]);
 });
+
+// PATCH /api/motors/:motorId/tests/:stepCode/admin-edit  — admin only
+router.patch('/motors/:motorId/tests/:stepCode/admin-edit', auth, requireRole('admin'), async (req, res) => {
+  const { motorId, stepCode } = req.params;
+  const { startedAt, completedAt, operatorNameOverride } = req.body;
+
+  const updates = [];
+  const vals = [];
+  let idx = 1;
+  if (startedAt !== undefined)            { updates.push(`started_at=$${idx++}`);              vals.push(startedAt || null); }
+  if (completedAt !== undefined)          { updates.push(`completed_at=$${idx++}`);            vals.push(completedAt || null); }
+  if (operatorNameOverride !== undefined) { updates.push(`operator_name_override=$${idx++}`);  vals.push(operatorNameOverride || null); }
+  if (updates.length === 0) return res.status(400).json({ error: 'Güncellenecek alan yok' });
+
+  vals.push(motorId, stepCode);
+  const { rows } = await pool.query(
+    `UPDATE motor_tests SET ${updates.join(', ')} WHERE motor_id=$${idx} AND step_code=$${idx+1} RETURNING *`,
+    vals
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Test bulunamadı' });
+  res.json(rows[0]);
+});
