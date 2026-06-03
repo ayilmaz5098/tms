@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { login } from '../lib/api.js';
 import { useAuthStore } from '../store/auth.js';
+import tmsLogo from '../tmslogo.jpeg';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -32,8 +33,7 @@ export default function Login() {
       <div style={{ width: 360 }}>
         {/* Brand */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ width: 52, height: 52, background: 'var(--accent)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 15, color: '#000', letterSpacing: 1, marginBottom: 10 }}>TMS</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, letterSpacing: 4 }}>TMS</div>
+          <img src={tmsLogo} alt="TMS" style={{ height: 72, width: 'auto', marginBottom: 10 }} />
           <div style={{ fontSize: 9, color: 'var(--text3)', letterSpacing: 2, marginTop: 3, fontFamily: 'var(--mono)' }}>TRACEABILITY MANAGEMENT SYSTEM · v1.0</div>
         </div>
 
