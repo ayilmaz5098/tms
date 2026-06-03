@@ -173,7 +173,7 @@ function TestStepPanel({ step, test, motorId, onSaved, isAdmin, currentUser }) {
       });
       (step.extra_fields || []).forEach(f => { if (init[f.key] === undefined) init[f.key] = ''; });
     } else if (step.type === 'vibration') {
-      step.fields.forEach(f => { if (init[f.key] === undefined) init[f.key] = ''; });
+      ['d_x','d_y','d_z','n_x','n_y','n_z','remark'].forEach(k => { if (init[k] === undefined) init[k] = ''; });
     } else if (step.type === 'table') {
       step.fields?.forEach(f => { if (init[f.key] === undefined) init[f.key] = ''; });
     } else if (step.type === 'checklist') {
