@@ -54,20 +54,6 @@ export default function Login() {
           </button>
         </form>
 
-        <div style={{ marginTop: 14, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: '10px 14px' }}>
-          <div style={{ fontSize: 9, fontFamily: 'var(--mono)', color: 'var(--text3)', letterSpacing: 1, marginBottom: 6, textTransform: 'uppercase' }}>Demo Hesaplar (Şifre: tms2026)</div>
-          {[
-            ['admin@tms.com',    '👑 Yönetici'],
-            ['operator@tms.com', '🔧 Operatör'],
-            ['qc@tms.com',       '🔍 Kalite KTR.'],
-          ].map(([e, lbl]) => (
-            <div key={e} onClick={() => { setEmail(e); setPass('tms2026'); }}
-              style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', cursor: 'pointer', fontSize: 11, borderBottom: '1px solid var(--border)', color: 'var(--text2)' }}>
-              <span style={{ fontFamily: 'var(--mono)' }}>{e}</span>
-              <span>{lbl}</span>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
